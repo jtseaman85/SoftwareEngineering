@@ -8,19 +8,14 @@ import java.io.*;
 public class SocketConnection {
 	
 	private boolean isHost = false;
+	private boolean isConnected = false;
 	private Socket socket = null;
 	private ServerSocket hostSocket = null;
 	private PrintWriter out = null;
 	private BufferedReader in = null;
 	
-	/**
-	 * @param ishost - if this is the server or client socket.
-	 */
-	public SocketConnection(boolean ishost) {
-		this.isHost = ishost;
-	}
-	
 	public boolean isHost() { return isHost; }
+	public boolean isConnected() { return isConnected; }
 	
 	public void setIsHost(boolean b) {
 		isHost = b;
