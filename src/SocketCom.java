@@ -9,21 +9,8 @@ import java.net.UnknownHostException;
 public class SocketCom {
 
 	private static SocketConnection myConn = null;
-	
-	private static enum Command {
-		MOVE(0), NEW(1), RESTORE(2), RESIGN(3), SAVE(4), DRAW(5);
-		
-		private int code;
-		
-		private Command(int i) {
-			code = i;
-		}
-
-		@Override
-		public String toString() {
-			return Integer.toString(code);
-		}
-	}
+	private Command command;
+	private String lastCmd = "";
 	
 	private static enum Parameter {
 		DECLINE(0), ACCEPT(1), REQUEST(2), COORVAL(3);
@@ -62,7 +49,7 @@ public class SocketCom {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		System.out.println("sending new game request");
+		debug_print("sending new game request");
 	}
 	
 	/**
@@ -96,36 +83,37 @@ public class SocketCom {
 			sendData(str);
 			myConn.closeConnection();
 		}
-		System.out.println("sending new game reply: " + str);
+		debug_print("sending new game reply: " + str);
 		return str;
 	}
 	
 	/**
 	 * Listens for an accept/decline reply from the server for a new game request.
-	 * @return true if the server accepted the request, false if declined.
+	 * @return true if the server accepted the request, false if declined or error occurs.
 	 * @throws IOException - An I/O error occurred when receiving the data.
 	 */
 	public boolean recNewGameReply() {
+		// Wait for something to be received
 		while(!myConn.hasIncoming());
+		
 		String str = myConn.receive();
-		System.out.println("recieve new game reply: " + str);
+		debug_print("recieve new game reply: " + str);
 		
 		int cmd = getCommand(str);
 		
-		if (cmd != Command.NEW.code) {
-			// Invalid command code, throw error
+		if (cmd != Command.NEW.toInt()) {
+			printError("invalid command in recNewGameReply. expected command: " + Command.NEW.toString() + " but got: " + cmd);
+			return false;
 		}
 		
 		int param = getReply(str);
-		
-		if (param < 0 || param > 1) {
-			// Invalid reply parameter, throw error
-		}
-		
 		if (param == 1) {
 			return true;
+		} else if (param == 0) {
+			return false;
 		} else {
-			myConn.closeConnection();
+			// Invalid reply value
+			printError("invalid reply value in recNewGameReply. expected: {0,1} but got " + param);
 			return false;
 		}
 	}
@@ -147,7 +135,7 @@ public class SocketCom {
 		str += String.valueOf(p[1].x) + String.valueOf(p[1].y);
 		
 		sendData(str);
-		System.out.println("send piece move: " + str);
+		debug_print("send piece move: " + str);
 		return str;
 	}
 	
@@ -170,7 +158,7 @@ public class SocketCom {
 		}
 		*/
 		
-		System.out.println("recieve piece move: " + str);
+		debug_print("recieve piece move: " + str);
 		Point move[] = getCoordinates(str);
 		
 		// TODO: If statement to check valid coordinate values for board
@@ -215,6 +203,10 @@ public class SocketCom {
 	}
 	
 	private void printError(String s) {
-    	System.out.println("SocketConnection Error: " + s);
+    	System.out.println("SocketCom Error: " + s);
     }
+	
+	private void debug_print(String s) {
+		System.out.println(s);
+	}
 }
