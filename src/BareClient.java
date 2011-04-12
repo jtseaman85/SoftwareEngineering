@@ -15,16 +15,19 @@ public class BareClient {
 		p[1] = new Point(6,6);
 		
 		try {
-			sc.sendNewGameReq("129.89.25.125");
+			sc.sendNewGameReq("192.168.1.104");
 			while(!sc.isConnected());
 			sc.recNewGameReply();
-			sc.sendPieceMove(p);
 			sc.recPieceMove();
+			
+			// Supposed to sendPieceMove, but request Draw instead
+			sc.sendDrawReq();
+			sc.recDrawReply();
+			
 			sc.closeConnection();
 			
-			/*SocketConnection sc = new SocketConnection(false, "129.89.25.125", 5678);
-			//print("connected");
-			sc.closeConnection();*/
+			
+			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

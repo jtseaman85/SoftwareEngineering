@@ -9,8 +9,12 @@ import java.net.UnknownHostException;
 public class SocketCom {
 
 	private static SocketConnection myConn = null;
-	private Command command;
-	private String lastCmd = "";
+	private Point[] coordinates;
+	private boolean reply;
+	private String message;
+	private boolean draw = false;
+	private boolean resign = false;
+	private boolean save = false;
 	
 	private static enum Parameter {
 		DECLINE(0), ACCEPT(1), REQUEST(2), COORVAL(3);
@@ -27,6 +31,24 @@ public class SocketCom {
 		}
 	}
 	
+	public boolean isDraw() {
+		return draw;
+	}
+	
+	public boolean isResign() {
+		return resign;
+	}
+	
+	public boolean isSave() {
+		return save;
+	}
+	
+	public void resetInterrupts() {
+		draw = false;
+		resign = false;
+		save = false;
+	}
+	
 	/**
 	 * Return true if the socket connection is currently connected.
 	 * @return true if socket is connected.
@@ -35,6 +57,7 @@ public class SocketCom {
 		return myConn.isConnected();
 	}
 	
+	//TODO: Detailed error handling
 	/**
 	 * Attempts to send a request to the server for a new game. A subsequent call to 
 	 * {@link #recNewGameReply()} should be made. 
@@ -52,6 +75,7 @@ public class SocketCom {
 		debug_print("sending new game request");
 	}
 	
+	//TODO: Detailed error handling
 	/**
 	 * Listens for an incoming request from the client for a new game. A subsequent call to 
 	 * {@link #sendNewGameReply(boolean)} should be made. 
@@ -67,6 +91,7 @@ public class SocketCom {
 		}
 	}
 	
+	//TODO: Detailed error handling
 	/**
 	 * Sends an accept/decline reply to the client for a new game request.
 	 * @param choice - Accept/Decline boolean decision.
@@ -81,7 +106,6 @@ public class SocketCom {
 		} else {
 			str += Parameter.DECLINE.toString();
 			sendData(str);
-			myConn.closeConnection();
 		}
 		debug_print("sending new game reply: " + str);
 		return str;
@@ -102,8 +126,8 @@ public class SocketCom {
 		int cmd = getCommand(str);
 		
 		if (cmd != Command.NEW.toInt()) {
-			printError("invalid command in recNewGameReply. expected command: " + Command.NEW.toString() + " but got: " + cmd);
-			return false;
+			printError("invalid command in recNewGameReply. expected command: " + Command.NEW.toInt() + " but got: " + cmd);
+			//return false;
 		}
 		
 		int param = getReply(str);
@@ -118,6 +142,7 @@ public class SocketCom {
 		}
 	}
 	
+	//TODO: Detailed error handling
 	/**
 	 * Send data of a moved piece.
 	 * @precondition - The piece move has been validated on the current computer.
@@ -139,6 +164,7 @@ public class SocketCom {
 		return str;
 	}
 	
+	//TODO: Detailed error handling
 	/**
 	 * Listen for data of the next piece move. The validity of the move is implied as the sender
 	 * is responsible for validating the piece move.
@@ -150,13 +176,16 @@ public class SocketCom {
 		while(!myConn.hasIncoming());
 		String str = myConn.receive();
 		
-		/*
 		int cmd = getCommand(str);
 		
-		if (cmd != Command.MOVE.code) {
+		if (handleUnexpectedCommand(cmd)) {
+			// Command is not a piece move command
+			return null;
+		}
+		
+		if (cmd != Command.MOVE.toInt()) {
 			// Invalid command code, throw error
 		}
-		*/
 		
 		debug_print("recieve piece move: " + str);
 		Point move[] = getCoordinates(str);
@@ -164,6 +193,87 @@ public class SocketCom {
 		// TODO: If statement to check valid coordinate values for board
 		
 		return move;
+	}
+	
+	public String sendDrawReq() {
+		
+		String str = Command.DRAW.toString();
+		
+		try {
+			sendData(str);
+			debug_print("send draw request: " + str);
+		} catch (IOException e) {
+			printError("IOException occurred in sendDrawReq");
+		}
+
+		return str;
+	}
+	
+	public String sendDrawReply(boolean choice) throws IOException {
+		
+		String str = Command.DRAW.toString(); 
+		
+		if (choice) {
+			str += Parameter.ACCEPT.toString();
+			sendData(str);
+		} else {
+			str += Parameter.DECLINE.toString();
+			sendData(str);
+		}
+		debug_print("sending draw reply: " + str);
+		return str;
+	}
+	
+	public boolean recDrawReply() {
+		
+		// Wait for something to be received
+		while(!myConn.hasIncoming());
+		
+		String str = myConn.receive();
+		debug_print("recieve draw reply: " + str);
+		
+		int cmd = getCommand(str);
+		
+		if (cmd != Command.DRAW.toInt()) {
+			printError("invalid command in recDrawReply. expected command: " + Command.DRAW.toInt() + " but got: " + cmd);
+			return false;
+		}
+		
+		int param = getReply(str);
+		if (param == 1) {
+			return true;
+		} else if (param == 0) {
+			return false;
+		} else {
+			// Invalid reply value
+			printError("invalid reply value in recDrawReply. expected: {0,1} but got " + param);
+			return false;
+		}
+	}
+	
+	/**
+	 * Checks for any of the game interrupt commands that can be sent at any time.
+	 * Should be checked inside every receive method except recNewGameReply.
+	 * @param i - Command integer value to check
+	 * @return true if an interrupt is detected, false if not.
+	 */
+	private boolean handleUnexpectedCommand(int i) {
+		
+		if (i == Command.DRAW.toInt()) {
+			System.out.println("received a draw interrupt");
+			draw = true;
+			return true;
+		} else if (i == Command.RESIGN.toInt()) {
+			System.out.println("received a resign interrupt");
+			resign = true;
+			return true;
+		} else if (i == Command.SAVE.toInt()) {
+			System.out.println("received a save interrupt");
+			save = true;
+			return true;
+		} else {
+			return false;
+		}
 	}
 	
 	/**
@@ -179,11 +289,15 @@ public class SocketCom {
 	}
 	
 	private int getCommand(String s) {
-		return Integer.valueOf(s.charAt(0));
+		//return Integer.valueOf(s.charAt(0));
+		s = s.substring(0, 1);
+		return Integer.valueOf(s);
 	}
 	
 	private int getReply(String s) {
-		return Integer.valueOf(s.charAt(1));
+		//return Integer.valueOf(s.charAt(1));
+		s = s.substring(1, 2);
+		return Integer.valueOf(s);
 	}
 	
 	private Point[] getCoordinates(String s) {

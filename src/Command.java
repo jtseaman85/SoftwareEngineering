@@ -1,6 +1,6 @@
 
 public enum Command {
-	MOVE(0), NEW(1), RESTORE(2), RESIGN(3), SAVE(4), DRAW(5);
+	MOVE(0), NEW(1), RESTORE(2), RESIGN(3), SAVE(4), DRAW(5), TEXT(6), ACK(7);
 	
 	private int code;
 	
